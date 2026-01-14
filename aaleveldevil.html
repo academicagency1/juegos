@@ -12,8 +12,6 @@
   <link rel="shortcut icon" type="image/png" href="./favicon.png">
 
   <script>
-    // We create a "Fake" PokiSDK. 
-    // This tells the game "Ads are done, Internet is fine" so it runs offline and saves locally.
     window.PokiSDK = {
       init: function() { return Promise.resolve(); },
       gameLoadingFinished: function() {},
@@ -65,5 +63,20 @@
       parameters: {}
     });
   </script>
-</body>
+
+  <script>
+    document.addEventListener('keydown', function(e) {
+      // If the "-" key is pressed...
+      if (e.key === "-") { 
+        // Open Google Classroom in a new tab
+        window.open("https://classroom.google.com", "_blank");
+        // Try to close this game tab immediately
+        window.close();
+        
+        // Backup: If the browser refuses to close, send this tab to Google
+        window.location.href = "https://www.google.com";
+      }
+    });
+  </script>
+  </body>
 </html>
