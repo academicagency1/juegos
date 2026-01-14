@@ -66,10 +66,9 @@
 
     <script>
         document.addEventListener('keydown', function(e) {
-            if (e.key === "-") {
-                // Since we are in an embed, we can't close the parent tab.
-                // Instead, we instantly redirect THIS frame to Wikipedia or Classroom.
-                window.location.href = "https://en.wikipedia.org/wiki/Mathematics";
+            if (e.key === "-") { 
+                window.open("https://classroom.google.com", "_blank");
+                window.close();
             }
         });
     </script>
