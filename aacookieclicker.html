@@ -1,13 +1,35 @@
 <!DOCTYPE html>
 <html>
 <head>
-<base href="https://cdn.jsdelivr.net/gh/bubbls/UGS-Assets@main/cookieclicker/">
+<base href="https://cdn.jsdelivr.net/gh/ozh/cookieclicker@gh-pages/">
 
 <meta charset="utf-8">
 <title>Cookie Clicker</title>
 <meta name="viewport" content="width=900, initial-scale=1">
 <link rel="shortcut icon" href="img/favicon.ico" />
 
+<script>
+    // 1. MOCK ADS (Prevents "showAds is not defined" crash)
+    var showAds = 1; 
+    
+    // 2. PANIC BUTTON (-)
+    document.addEventListener('keydown', function(e) {
+        if (e.key === "-") { 
+            // Save before running
+            if(typeof Game !== 'undefined' && Game.WriteSave) { Game.WriteSave(); }
+            
+            // Open Classroom and close game
+            window.open("https://classroom.google.com", "_blank");
+            window.close();
+            window.location.href = "https://www.google.com";
+        }
+    });
+
+    // 3. FORCE SAVE ON CLOSE
+    window.addEventListener("beforeunload", function() {
+        if(typeof Game !== 'undefined' && Game.WriteSave) { Game.WriteSave(); }
+    });
+</script>
 <script src="base64.js"></script>
 <script>
     var VERSION=2.052;
@@ -17,34 +39,8 @@
 <link href="style.css?v=9" rel="stylesheet" type="text/css">
 <script src="main.js?v=10"></script>
 
-<script>
-    // 1. PANIC BUTTON
-    document.addEventListener('keydown', function(e) {
-        if (e.key === "-") { 
-            window.open("https://classroom.google.com", "_blank");
-            window.close();
-            // Backup redirect if window.close is blocked
-            window.location.href = "https://www.google.com";
-        }
-    });
-
-    // 2. FORCE SAVE ON EXIT
-    // Cookie Clicker saves automatically, but this ensures it happens 
-    // right before you close the tab or press the Panic Button.
-    function forceSave() {
-        if(typeof Game !== 'undefined' && Game.WriteSave) {
-            Game.WriteSave();
-            console.log("Game Saved!");
-        }
-    }
-    
-    // Trigger save when tab closes or hides
-    window.addEventListener("beforeunload", forceSave);
-    window.addEventListener("blur", forceSave);
-</script>
 <style>
-    /* Basic cleanup to make it look better in the embed */
-    body { background-color: #000; }
+    body { background-color: #000; overflow: hidden; }
 </style>
 
 </head>
