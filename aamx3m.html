@@ -1,0 +1,155 @@
+<html>
+<head>
+    <base target="_blank">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Vampire Survivors (Fixed)</title>
+    <style>
+        html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; font-family: "Gill Sans", sans-serif; background: #1a1a1a; }
+        .game-embed-container { width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; background-color: #000; position: relative; }
+        
+        /* Loading / Menu Styles */
+        #menuOverlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: #274e13; display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 10; }
+        .logo-text { font-family: "Gill Sans", sans-serif; font-size: 2.5rem; font-weight: bold; color: #ffffff; text-shadow: 2px 2px 5px rgba(0, 0, 0, 0.6); margin-bottom: 30px; }
+        .c-button { cursor: pointer; background: #6aa84f; color: white; border: none; padding: 15px 30px; font-size: 1.2rem; font-weight: bold; border-radius: 8px; transition: transform 0.2s; box-shadow: 0 4px 6px rgba(0,0,0,0.3); }
+        .c-button:hover { background: #8fbc8f; transform: scale(1.05); }
+        .c-button:disabled { background: #555; cursor: wait; }
+        
+        iframe { width: 100%; height: 100%; border: none; display: block; }
+    </style>
+</head>
+<body>
+
+    <div id="menuOverlay">
+        <div class="logo-text">Vampire Survivors</div>
+        <button id="playBtn" class="c-button" disabled>Loading Game Data...</button>
+        <div id="status" style="color: #ccc; margin-top: 10px; font-size: 0.9rem;">Initializing...</div>
+    </div>
+
+    <div id="gameContainer" class="game-embed-container"></div>
+
+    <script>
+        // --- CONFIG ---
+        const gameXmlUrl = "https://120164218-101451616934779516.preview.editmysite.com/uploads/b/139890129-624069120114626136/files/m3m.xml";
+        const playBtn = document.getElementById('playBtn');
+        const statusText = document.getElementById('status');
+        const gameContainer = document.getElementById('gameContainer');
+        const menuOverlay = document.getElementById('menuOverlay');
+
+        let readyHtmlContent = null;
+
+        // --- FETCH AND PREPARE GAME ---
+        async function prepareGameContent() {
+            try {
+                const resp = await fetch(gameXmlUrl);
+                if (!resp.ok) throw new Error(`Failed to load XML: ${resp.status}`);
+                
+                // Parse XML
+                const xmlText = await resp.text();
+                const parser = new DOMParser();
+                const xmlDoc = parser.parseFromString(xmlText, "application/xml");
+                const contentNode = xmlDoc.querySelector("Content");
+                if (!contentNode) throw new Error("Game content not found in XML");
+                
+                // Get HTML content
+                const htmlContent = contentNode.textContent;
+                const doc = parser.parseFromString(htmlContent, 'text/html');
+
+                // Inject Base Tag (Crucial for assets loading)
+                const baseTag = doc.createElement('base');
+                baseTag.href = gameXmlUrl.substring(0, gameXmlUrl.lastIndexOf('/') + 1);
+                doc.head.prepend(baseTag);
+
+                // --- PANIC KEY INJECTION ---
+                // We inject the panic script directly into the game code
+                const panicScript = doc.createElement('script');
+                panicScript.textContent = `
+                    document.addEventListener('keydown', function(e) {
+                        if (e.key === "-") {
+                            window.top.location.replace("https://classroom.google.com");
+                        }
+                    });
+                `;
+                doc.body.appendChild(panicScript);
+                // ---------------------------
+
+                // Handle Scripts (Fix C3 Runtime)
+                const allScripts = Array.from(doc.querySelectorAll('script[src]'));
+                const mainScriptTag = allScripts.find(s => !s.src.includes('imasdk') && !s.src.includes('googletagmanager'));
+                
+                if (mainScriptTag) {
+                    const mainJsUrl = mainScriptTag.src;
+                    let mainJsText = await (await fetch(mainJsUrl)).text();
+                    
+                    // Patch Runtime
+                    const runtimeListRegex = /runtimeScriptList\s*:\s*\[\s*["']([^"']+)["']\s*\]/;
+                    const runtimeMatch = mainJsText.match(runtimeListRegex);
+                    
+                    if (runtimeMatch) {
+                        mainJsText = mainJsText.replace('scriptFolder:"scripts/"', 'scriptFolder:""');
+                        const c3RuntimeUrl = runtimeMatch[1];
+                        let c3RuntimeText = await (await fetch(c3RuntimeUrl)).text();
+                        
+                        // Fix domain check
+                        c3RuntimeText = c3RuntimeText.replace(/new URL\(fulldomain\)\.hostname/g, 'location.hostname');
+                        
+                        // Inject runtime
+                        const c3Script = doc.createElement('script');
+                        c3Script.textContent = c3RuntimeText;
+                        doc.head.appendChild(c3Script);
+                        
+                        // Clean main script
+                        mainJsText = mainJsText.replace(runtimeListRegex, 'runtimeScriptList:[]');
+                    }
+                    
+                    // Replace main script src with inline code
+                    mainScriptTag.removeAttribute('src');
+                    mainScriptTag.textContent = mainJsText;
+                }
+
+                readyHtmlContent = doc.documentElement.outerHTML;
+                
+                playBtn.disabled = false;
+                playBtn.textContent = "Play Game";
+                statusText.textContent = "Ready!";
+
+            } catch (err) {
+                statusText.style.color = "#ff5555";
+                statusText.textContent = "Error: " + err.message;
+                console.error(err);
+            }
+        }
+
+        // --- LAUNCH GAME (DIRECT WRITE METHOD) ---
+        playBtn.addEventListener('click', () => {
+            if (!readyHtmlContent) return;
+            
+            // Hide Menu
+            menuOverlay.style.display = 'none';
+
+            // Create Iframe
+            const iframe = document.createElement('iframe');
+            gameContainer.appendChild(iframe);
+
+            // WRITE content directly (Keeps the Origin consistent for Saving!)
+            const frameDoc = iframe.contentWindow.document;
+            frameDoc.open();
+            frameDoc.write(readyHtmlContent);
+            frameDoc.close();
+            
+            // Focus the iframe
+            iframe.contentWindow.focus();
+        });
+
+        // Start loading immediately
+        prepareGameContent();
+
+        // Global Panic Key (for the menu screen)
+        document.addEventListener('keydown', function(e) {
+            if (e.key === "-") {
+                window.location.replace("https://classroom.google.com");
+            }
+        });
+
+    </script>
+</body>
+</html>
