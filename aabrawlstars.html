@@ -6,60 +6,16 @@
 <title>Google Classroom</title>
 <link rel="icon" type="image/png" href="https://ssl.gstatic.com/classroom/favicon.png">
 <style>
-    html, body {
-        width: 100%;
-        height: 100%;
-        padding: 0px;
-        margin: 0px;
-        background: #242424;
-    }
-    .fullscreen {
-        background: #242424;
-        width: 100%;
-        height: 100%;
-        position: absolute;
-        top: 0px;
-        left: 0px;
-    }
-    #banner-container {
-        position: absolute;
-        bottom: 0px;
-        width: 100%;
-        height: 90px;
-        display: none !important;
-    }
-    #loading-overlay {
-        font-size: 20px;
-        z-index: 1;
-        display: flex;
-        flex-direction: column;
-        justify-content: center;
-        align-items: center;
-    }
-    #icon {
-        max-width: 300px;
-        border-radius: 10px;
-        margin-bottom: 20px;
-    }
-    #progress-bar {
-        border-radius: 5px;
-        width: 90%;
-        max-width: 250px;
-        height: 20px;
-        background: #181818;
-        padding: 5px;
-    }
-    #progress-bar-fill {
-        border-radius: 3px;
-        width: 0%;
-        height: 100%;
-        background: #9747FF;
-    }
+    html, body { width: 100%; height: 100%; padding: 0; margin: 0; background: #242424; overflow: hidden; }
+    .fullscreen { background: #242424; width: 100%; height: 100%; position: absolute; top: 0; left: 0; }
+    #loading-overlay { z-index: 10; display: flex; flex-direction: column; justify-content: center; align-items: center; }
+    #icon { max-width: 300px; border-radius: 10px; margin-bottom: 20px; }
+    #progress-bar { border-radius: 5px; width: 90%; max-width: 250px; height: 20px; background: #181818; padding: 5px; }
+    #progress-bar-fill { border-radius: 3px; width: 0%; height: 100%; background: #9747FF; transition: width 0.2s; }
 </style>
 </head>
 <body>
 <canvas id="canvas" class="fullscreen"></canvas>
-<div id="banner-container"></div>
 <div id="loading-overlay" class="fullscreen">
     <img id="icon" src="https://cdn.jsdelivr.net/gh/ragdoi-archers/zort@main/icon.png"/>
     <div id="progress-bar"><div id="progress-bar-fill"></div></div>
@@ -67,92 +23,45 @@
 
 <script src="https://cdn.jsdelivr.net/gh/Deformed-steve/brawl-stars@main/howler.js"></script>
 <script>
-    if (/iPhone|iPad|iPod|Android/i.test(navigator.userAgent)) {
-        let meta = document.createElement('meta');
-        meta.name = 'viewport';
-        meta.content = 'width=device-width, height=device-height, initial-scale=1.0, user-scalable=no, shrink-to-fit=yes';
-        document.head.appendChild(meta);
-    }
-
-    const canvas = document.getElementById('canvas');
-    const loadingOverlay = document.getElementById('loading-overlay');
-    const progressBarFill = document.getElementById('progress-bar-fill');
-    let unityInstance = null;
-    let progressBarFillingInterval = null;
-    let progressBarCompleteFillingStarted = false;
+    // --- STEP 1: DEFINE ALL BRIDGE FUNCTIONS IMMEDIATELY ---
+    window.unityInstance = null;
 
     function sendMessageToUnity(name, value) {
-        if (unityInstance !== null) {
-            unityInstance.SendMessage('PlaygamaBridge', name, value || '');
+        if (window.unityInstance) {
+            window.unityInstance.SendMessage('PlaygamaBridge', name, value || '');
         }
     }
 
-    function onUnityLoadingProgressChanged(progress) {
-        if (progress >= 1 && progressBarFillingInterval !== null) {
-            clearInterval(progressBarFillingInterval);
-            progressBarFillingInterval = null;
-            return;
-        }
-        if (progressBarCompleteFillingStarted) return;
-        if (progress >= 0.9) {
-            progressBarCompleteFillingStarted = true;
-            completeProgressBarFilling();
-            return;
-        }
-        progressBarFill.style.width = `${progress * 100}%`;
-    }
-
-    function completeProgressBarFilling() {
-        if (progressBarFillingInterval !== null) return;
-        let currentPercent = 90;
-        progressBarFill.style.width = `${currentPercent}%`;
-        progressBarFillingInterval = setInterval(() => {
-            currentPercent++;
-            if (currentPercent > 100) currentPercent = 100;
-            progressBarFill.style.width = `${currentPercent}%`;
-            if (currentPercent >= 100) {
-                clearInterval(progressBarFillingInterval);
-                progressBarFillingInterval = null;
-            }
-        }, 100);
-    }
-
-    // === MOCK BRIDGE (Keep this for loading stability) ===
-    window.bridge = {
-        platform: { id: '', language: 'en', payload: '', tld: '' },
-        device: { type: 'desktop' },
-        player: { isAuthorizationSupported: false, isAuthorized: false, id: '', name: '', photos: [] },
-        game: { visibilityState: 'visible' },
-        storage: { defaultType: 'local', isSupported: () => true, isAvailable: () => true },
-        advertisement: { interstitialState: '', isBannerSupported: false, minimumDelayBetweenInterstitial: 0 },
-        social: {}, leaderboard: {}, payments: {}, remoteConfig: { isSupported: false }, achievements: {},
-        initialize: () => Promise.resolve(),
-        advertisement: { on: () => {} },
-        game: { on: () => {} }
-    };
-
-    // Platform & Device Defaults
-    window.getPlatformId = () => '';
+    // Platform & Device (Fixed to prevent crashes)
+    window.getPlatformId = () => 'web';
     window.getPlatformLanguage = () => 'en';
     window.getPlatformPayload = () => '';
-    window.getPlatformTld = () => '';
+    window.getPlatformTld = () => 'com';
     window.getDeviceType = () => 'desktop';
-    window.getServerTime = () => sendMessageToUnity('OnGetServerTimeCompleted', Date.now().toString());
+    window.getServerTime = () => Date.now().toString();
+    window.getVisibilityState = () => 'visible';
 
-    // === REPAIRED STORAGE LOGIC ===
+    // Player & Social (Mocks)
+    window.getIsPlayerAuthorized = () => 'false';
+    window.getPlayerId = () => 'guest';
+    window.getPlayerName = () => 'Guest';
+    window.getPlayerPhotos = () => '[]';
+    window.authorizePlayer = () => sendMessageToUnity('OnAuthorizeCompleted', 'false');
+
+    // Storage Logic (Saving enabled via localStorage)
     window.getStorageDefaultType = () => 'local';
     window.getIsStorageSupported = () => 'true';
     window.getIsStorageAvailable = () => 'true';
-
+    
     window.getStorageData = (key) => {
-        const value = localStorage.getItem(key) || ""; 
-        console.log("LOAD ATTEMPT - Key:", key, "Value:", value);
-        sendMessageToUnity('OnGetStorageDataSuccess', key + '{bridge_data_separator}' + value);
+        const val = localStorage.getItem(key) || "";
+        console.log("Loading Save:", key);
+        sendMessageToUnity('OnGetStorageDataSuccess', key + '{bridge_data_separator}' + val);
     };
 
     window.setStorageData = (key, value) => {
-        console.log("SAVE ATTEMPT - Key:", key, "Value:", value);
         localStorage.setItem(key, value);
+        console.log("Saving Progress:", key);
         sendMessageToUnity('OnSetStorageDataSuccess', key);
     };
 
@@ -161,19 +70,28 @@
         sendMessageToUnity('OnDeleteStorageDataSuccess', key);
     };
 
-    // Remaining Bridge Functions
-    window.getVisibilityState = () => 'visible';
-    window.getInterstitialState = () => '';
+    // Ads & Leaderboards (Empty to prevent errors)
+    window.getInterstitialState = () => 'closed';
     window.getIsBannerSupported = () => 'false';
     window.showInterstitial = () => {};
     window.showRewarded = () => {};
-    window.checkAdBlock = () => sendMessageToUnity('OnCheckAdBlockCompleted', 'false');
+    window.leaderboardSetScore = () => {};
+    window.leaderboardGetScore = () => {};
 
-    // Unity Loader Logic
+    // Mock Bridge Object
+    window.bridge = {
+        platform: { id: 'web', language: 'en' },
+        storage: { isSupported: () => true, isAvailable: () => true },
+        initialize: () => Promise.resolve(),
+        advertisement: { on: () => {} },
+        game: { on: () => {} }
+    };
+
+    // --- STEP 2: UNITY LOADER ---
     const unityLoader = document.createElement('script');
     unityLoader.src = 'https://cdn.jsdelivr.net/gh/ragdoi-archers/zort@main/Build/web.loader.js';
     unityLoader.onload = () => {
-        createUnityInstance(canvas, {
+        createUnityInstance(document.getElementById('canvas'), {
             dataUrl: 'https://cdn.jsdelivr.net/gh/ragdoi-archers/zort@main/Build/web.data.unityweb',
             frameworkUrl: 'https://cdn.jsdelivr.net/gh/ragdoi-archers/zort@main/Build/web.framework.js.unityweb',
             codeUrl: 'https://cdn.jsdelivr.net/gh/ragdoi-archers/zort@main/Build/web.wasm.unityweb',
@@ -181,26 +99,26 @@
             companyName: 'DefaultCompany',
             productName: 'Clicker',
             productVersion: '0.1',
-        }, onUnityLoadingProgressChanged)
+        }, (progress) => {
+            document.getElementById('progress-bar-fill').style.width = (progress * 100) + "%";
+        })
         .then((instance) => {
             window.unityInstance = instance;
-            loadingOverlay.remove();
-            canvas.focus();
+            document.getElementById('loading-overlay').remove();
         });
     };
     document.body.appendChild(unityLoader);
 
-    // Howler Audio
+    // --- STEP 3: UTILITIES ---
+    document.addEventListener('keydown', (e) => {
+        if (e.key === '-') window.location.href = "https://classroom.google.com";
+    });
+
     var sound = new Howl({
         src: ['https://cdn.jsdelivr.net/gh/ragdoi-archers/zort@main/StreamingAssets/SongInMenu.mp3'],
         loop: true, volume: 0
     });
     sound.play();
-
-    // Panic Button (-)
-    document.addEventListener('keydown', (e) => {
-        if (e.key === '-') window.location.href = "https://classroom.google.com";
-    });
 </script>
 </body>
 </html>
