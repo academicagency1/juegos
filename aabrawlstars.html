@@ -5,93 +5,76 @@
     <title>Google Classroom</title>
     <link rel="icon" type="image/png" href="https://ssl.gstatic.com/classroom/favicon.png">
     <style>
-        html, body { width: 100%; height: 100%; padding: 0; margin: 0; overflow: hidden; }
-        .fullscreen { background: #242424; width: 100%; height: 100%; position: absolute; top: 0; left: 0; }
-        #loading-overlay { z-index: 1; display: flex; flex-direction: column; justify-content: center; align-items: center; }
-        #icon { max-width: 300px; border-radius: 10px; margin-bottom: 20px; }
-        #progress-bar { border-radius: 5px; width: 90%; max-width: 250px; height: 20px; background: #181818; padding: 5px; }
-        #progress-bar-fill { border-radius: 3px; width: 0%; height: 100%; background: #9747FF; }
+        html, body { width: 100%; height: 100%; padding: 0; margin: 0; overflow: hidden; background: #242424; }
+        #canvas { width: 100%; height: 100%; position: absolute; }
+        #loading-overlay { position: absolute; width: 100%; height: 100%; display: flex; flex-direction: column; justify-content: center; align-items: center; z-index: 10; background: #242424; }
+        #icon { max-width: 200px; border-radius: 10px; margin-bottom: 20px; }
+        #progress-bar { width: 200px; height: 10px; background: #181818; border-radius: 5px; }
+        #progress-bar-fill { width: 0%; height: 100%; background: #9747FF; border-radius: 5px; transition: width 0.2s; }
     </style>
 </head>
 <body>
-    <canvas id="canvas" class="fullscreen"></canvas>
-    <div id="loading-overlay" class="fullscreen">
+    <div id="loading-overlay">
         <img id="icon" src="https://cdn.jsdelivr.net/gh/ragdoi-archers/zort@main/icon.png"/>
         <div id="progress-bar"><div id="progress-bar-fill"></div></div>
     </div>
+    <canvas id="canvas"></canvas>
 
-    <script src="https://cdn.jsdelivr.net/gh/Deformed-steve/brawl-stars@main/howler.js"></script>
     <script>
-        const canvas = document.getElementById('canvas');
-        const loadingOverlay = document.getElementById('loading-overlay');
-        const progressBarFill = document.getElementById('progress-bar-fill');
-        let unityInstance = null;
-
-        function sendMessageToUnity(name, value) {
-            if (unityInstance !== null) {
-                unityInstance.SendMessage('PlaygamaBridge', name, value || '');
-            }
-        }
-
-        // === CRITICAL FIX: ALL BRIDGE FUNCTIONS RE-ADDED ===
+        // 1. DEFINE ALL FUNCTIONS FIRST (Before Unity loads)
         window.getPlatformId = () => 'web';
         window.getPlatformLanguage = () => 'en';
         window.getDeviceType = () => 'desktop';
         window.getIsPlayerAuthorized = () => 'false';
         window.getVisibilityState = () => 'visible';
-        
-        // Advertisement Mocks (Stops the game from crashing when looking for ads)
-        window.getInterstitialState = () => '';
-        window.getIsBannerSupported = () => 'false';
-        window.showInterstitial = () => {};
-        window.showRewarded = () => {};
-
-        // === SAVING LOGIC (localStorage) ===
         window.getStorageDefaultType = () => 'local';
         window.getIsStorageSupported = () => 'true';
         window.getIsStorageAvailable = () => 'true';
+        window.getInterstitialState = () => 'closed';
+        window.getIsBannerSupported = () => 'false';
 
-        window.getStorageData = function(key) {
-            let data = localStorage.getItem(key) || "";
-            sendMessageToUnity('OnGetStorageDataSuccess', `${key}{bridge_data_separator}${data}`);
+        // 2. MOCK BRIDGE OBJECT
+        window.bridge = {
+            initialize: () => Promise.resolve(),
+            platform: { id: 'web', language: 'en' },
+            storage: { isSupported: () => true, isAvailable: () => true, defaultType: 'local' },
+            advertisement: { interstitialState: 'closed', isBannerSupported: false },
+            game: { visibilityState: 'visible' }
         };
 
-        window.setStorageData = function(key, value) {
+        // 3. STORAGE LOGIC
+        window.getStorageData = (key) => {
+            const data = localStorage.getItem(key) || "";
+            if (window.unityInstance) {
+                window.unityInstance.SendMessage('PlaygamaBridge', 'OnGetStorageDataSuccess', `${key}{bridge_data_separator}${data}`);
+            }
+        };
+        window.setStorageData = (key, value) => {
             localStorage.setItem(key, value);
-            sendMessageToUnity('OnSetStorageDataSuccess', key);
+            if (window.unityInstance) window.unityInstance.SendMessage('PlaygamaBridge', 'OnSetStorageDataSuccess', key);
         };
 
-        window.deleteStorageData = function(key) {
-            localStorage.removeItem(key);
-            sendMessageToUnity('OnDeleteStorageDataSuccess', key);
-        };
+        // 4. PANIC BUTTON (-)
+        document.addEventListener('keydown', (e) => {
+            if (e.key === '-') window.location.href = "https://classroom.google.com";
+        });
+    </script>
 
-        // Unity Engine Setup
-        const unityLoader = document.createElement('script');
-        unityLoader.src = 'https://cdn.jsdelivr.net/gh/ragdoi-archers/zort@main/Build/web.loader.js';
-        unityLoader.onload = () => {
-            createUnityInstance(canvas, {
-                dataUrl: 'https://cdn.jsdelivr.net/gh/ragdoi-archers/zort@main/Build/web.data.unityweb',
-                frameworkUrl: 'https://cdn.jsdelivr.net/gh/ragdoi-archers/zort@main/Build/web.framework.js.unityweb',
-                codeUrl: 'https://cdn.jsdelivr.net/gh/ragdoi-archers/zort@main/Build/web.wasm.unityweb',
-                streamingAssetsUrl: 'https://cdn.jsdelivr.net/gh/ragdoi-archers/zort@main/StreamingAssets/',
-                companyName: 'DefaultCompany',
-                productName: 'Clicker',
-                productVersion: '0.1',
-            }, (progress) => {
-                progressBarFill.style.width = `${progress * 100}%`;
-            })
-            .then((instance) => {
-                window.unityInstance = instance;
-                loadingOverlay.remove();
-            })
-            .catch((err) => { alert("Error loading game. Please refresh."); });
-        };
-        document.body.appendChild(unityLoader);
-
-        // PANIC BUTTON (-)
-        document.addEventListener('keydown', function(e) {
-            if (e.key === '-') { window.location.href = "https://classroom.google.com"; }
+    <script src="https://cdn.jsdelivr.net/gh/ragdoi-archers/zort@main/Build/web.loader.js"></script>
+    <script>
+        createUnityInstance(document.getElementById("canvas"), {
+            dataUrl: 'https://cdn.jsdelivr.net/gh/ragdoi-archers/zort@main/Build/web.data.unityweb',
+            frameworkUrl: 'https://cdn.jsdelivr.net/gh/ragdoi-archers/zort@main/Build/web.framework.js.unityweb',
+            codeUrl: 'https://cdn.jsdelivr.net/gh/ragdoi-archers/zort@main/Build/web.wasm.unityweb',
+            streamingAssetsUrl: 'https://cdn.jsdelivr.net/gh/ragdoi-archers/zort@main/StreamingAssets/',
+            companyName: 'DefaultCompany',
+            productName: 'Clicker',
+            productVersion: '0.1',
+        }, (progress) => {
+            document.getElementById("progress-bar-fill").style.width = (progress * 100) + "%";
+        }).then((instance) => {
+            window.unityInstance = instance;
+            document.getElementById("loading-overlay").style.display = "none";
         });
     </script>
 </body>
