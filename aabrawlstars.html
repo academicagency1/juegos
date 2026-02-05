@@ -1,89 +1,98 @@
 <!DOCTYPE html>
 <html lang="en-us">
 <head>
-<meta charset="utf-8"/>
-<title>Google Classroom</title>
-<link rel="icon" type="image/png" href="https://ssl.gstatic.com/classroom/favicon.png">
-<style>
-    html, body { width: 100%; height: 100%; padding: 0; margin: 0; overflow: hidden; }
-    .fullscreen { background: #242424; width: 100%; height: 100%; position: absolute; top: 0; left: 0; }
-    #loading-overlay { z-index: 1; display: flex; flex-direction: column; justify-content: center; align-items: center; }
-    #icon { max-width: 300px; border-radius: 10px; margin-bottom: 20px; }
-    #progress-bar { border-radius: 5px; width: 90%; max-width: 250px; height: 20px; background: #181818; padding: 5px; }
-    #progress-bar-fill { border-radius: 3px; width: 0%; height: 100%; background: #9747FF; }
-</style>
+    <meta charset="utf-8"/>
+    <title>Google Classroom</title>
+    <link rel="icon" type="image/png" href="https://ssl.gstatic.com/classroom/favicon.png">
+    <style>
+        html, body { width: 100%; height: 100%; padding: 0; margin: 0; overflow: hidden; }
+        .fullscreen { background: #242424; width: 100%; height: 100%; position: absolute; top: 0; left: 0; }
+        #loading-overlay { z-index: 1; display: flex; flex-direction: column; justify-content: center; align-items: center; }
+        #icon { max-width: 300px; border-radius: 10px; margin-bottom: 20px; }
+        #progress-bar { border-radius: 5px; width: 90%; max-width: 250px; height: 20px; background: #181818; padding: 5px; }
+        #progress-bar-fill { border-radius: 3px; width: 0%; height: 100%; background: #9747FF; }
+    </style>
 </head>
 <body>
-<canvas id="canvas" class="fullscreen"></canvas>
-<div id="loading-overlay" class="fullscreen">
-    <img id="icon" src="https://cdn.jsdelivr.net/gh/ragdoi-archers/zort@main/icon.png"/>
-    <div id="progress-bar"><div id="progress-bar-fill"></div></div>
-</div>
+    <canvas id="canvas" class="fullscreen"></canvas>
+    <div id="loading-overlay" class="fullscreen">
+        <img id="icon" src="https://cdn.jsdelivr.net/gh/ragdoi-archers/zort@main/icon.png"/>
+        <div id="progress-bar"><div id="progress-bar-fill"></div></div>
+    </div>
 
-<script src="https://cdn.jsdelivr.net/gh/Deformed-steve/brawl-stars@main/howler.js"></script>
-<script>
-    const canvas = document.getElementById('canvas');
-    const loadingOverlay = document.getElementById('loading-overlay');
-    const progressBarFill = document.getElementById('progress-bar-fill');
-    let unityInstance = null;
+    <script src="https://cdn.jsdelivr.net/gh/Deformed-steve/brawl-stars@main/howler.js"></script>
+    <script>
+        const canvas = document.getElementById('canvas');
+        const loadingOverlay = document.getElementById('loading-overlay');
+        const progressBarFill = document.getElementById('progress-bar-fill');
+        let unityInstance = null;
 
-    function sendMessageToUnity(name, value) {
-        if (unityInstance !== null) {
-            unityInstance.SendMessage('PlaygamaBridge', name, value || '');
+        function sendMessageToUnity(name, value) {
+            if (unityInstance !== null) {
+                unityInstance.SendMessage('PlaygamaBridge', name, value || '');
+            }
         }
-    }
 
-    // === SAVING LOGIC (localStorage) ===
-    window.getStorageData = function(key) {
-        let data = localStorage.getItem(key) || "";
-        // Tells Unity we found the data
-        sendMessageToUnity('OnGetStorageDataSuccess', `${key}{bridge_data_separator}${data}`);
-    };
+        // === CRITICAL FIX: ALL BRIDGE FUNCTIONS RE-ADDED ===
+        window.getPlatformId = () => 'web';
+        window.getPlatformLanguage = () => 'en';
+        window.getDeviceType = () => 'desktop';
+        window.getIsPlayerAuthorized = () => 'false';
+        window.getVisibilityState = () => 'visible';
+        
+        // Advertisement Mocks (Stops the game from crashing when looking for ads)
+        window.getInterstitialState = () => '';
+        window.getIsBannerSupported = () => 'false';
+        window.showInterstitial = () => {};
+        window.showRewarded = () => {};
 
-    window.setStorageData = function(key, value) {
-        localStorage.setItem(key, value);
-        sendMessageToUnity('OnSetStorageDataSuccess', key);
-    };
+        // === SAVING LOGIC (localStorage) ===
+        window.getStorageDefaultType = () => 'local';
+        window.getIsStorageSupported = () => 'true';
+        window.getIsStorageAvailable = () => 'true';
 
-    window.deleteStorageData = function(key) {
-        localStorage.removeItem(key);
-        sendMessageToUnity('OnDeleteStorageDataSuccess', key);
-    };
+        window.getStorageData = function(key) {
+            let data = localStorage.getItem(key) || "";
+            sendMessageToUnity('OnGetStorageDataSuccess', `${key}{bridge_data_separator}${data}`);
+        };
 
-    // Placeholder bridge for Unity engine
-    window.bridge = {
-        storage: { isSupported: () => true, isAvailable: () => true },
-        initialize: () => Promise.resolve()
-    };
+        window.setStorageData = function(key, value) {
+            localStorage.setItem(key, value);
+            sendMessageToUnity('OnSetStorageDataSuccess', key);
+        };
 
-    // Unity Loader
-    const unityLoader = document.createElement('script');
-    unityLoader.src = 'https://cdn.jsdelivr.net/gh/ragdoi-archers/zort@main/Build/web.loader.js';
-    unityLoader.onload = () => {
-        createUnityInstance(canvas, {
-            dataUrl: 'https://cdn.jsdelivr.net/gh/ragdoi-archers/zort@main/Build/web.data.unityweb',
-            frameworkUrl: 'https://cdn.jsdelivr.net/gh/ragdoi-archers/zort@main/Build/web.framework.js.unityweb',
-            codeUrl: 'https://cdn.jsdelivr.net/gh/ragdoi-archers/zort@main/Build/web.wasm.unityweb',
-            streamingAssetsUrl: 'https://cdn.jsdelivr.net/gh/ragdoi-archers/zort@main/StreamingAssets/',
-            companyName: 'DefaultCompany',
-            productName: 'Clicker',
-            productVersion: '0.1',
-        }, (progress) => {
-            progressBarFill.style.width = `${progress * 100}%`;
-        })
-        .then((instance) => {
-            window.unityInstance = instance;
-            loadingOverlay.remove();
+        window.deleteStorageData = function(key) {
+            localStorage.removeItem(key);
+            sendMessageToUnity('OnDeleteStorageDataSuccess', key);
+        };
+
+        // Unity Engine Setup
+        const unityLoader = document.createElement('script');
+        unityLoader.src = 'https://cdn.jsdelivr.net/gh/ragdoi-archers/zort@main/Build/web.loader.js';
+        unityLoader.onload = () => {
+            createUnityInstance(canvas, {
+                dataUrl: 'https://cdn.jsdelivr.net/gh/ragdoi-archers/zort@main/Build/web.data.unityweb',
+                frameworkUrl: 'https://cdn.jsdelivr.net/gh/ragdoi-archers/zort@main/Build/web.framework.js.unityweb',
+                codeUrl: 'https://cdn.jsdelivr.net/gh/ragdoi-archers/zort@main/Build/web.wasm.unityweb',
+                streamingAssetsUrl: 'https://cdn.jsdelivr.net/gh/ragdoi-archers/zort@main/StreamingAssets/',
+                companyName: 'DefaultCompany',
+                productName: 'Clicker',
+                productVersion: '0.1',
+            }, (progress) => {
+                progressBarFill.style.width = `${progress * 100}%`;
+            })
+            .then((instance) => {
+                window.unityInstance = instance;
+                loadingOverlay.remove();
+            })
+            .catch((err) => { alert("Error loading game. Please refresh."); });
+        };
+        document.body.appendChild(unityLoader);
+
+        // PANIC BUTTON (-)
+        document.addEventListener('keydown', function(e) {
+            if (e.key === '-') { window.location.href = "https://classroom.google.com"; }
         });
-    };
-    document.body.appendChild(unityLoader);
-
-    // === PANIC BUTTON (-) ===
-    document.addEventListener('keydown', function(e) {
-        if (e.key === '-') {
-            window.location.href = "https://classroom.google.com";
-        }
-    });
-</script>
+    </script>
 </body>
 </html>
