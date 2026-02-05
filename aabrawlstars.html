@@ -21,43 +21,75 @@
     <canvas id="canvas"></canvas>
 
     <script>
-        // 1. DEFINE ALL FUNCTIONS FIRST (Before Unity loads)
+        // --- 1. THE "MEGA BRIDGE" (Answers every question the game asks) ---
+        
+        // Platform & Device Info
         window.getPlatformId = () => 'web';
+        window.getPlatformPayload = () => '';   // <--- This fixes the new error
         window.getPlatformLanguage = () => 'en';
+        window.getPlatformTld = () => '';
         window.getDeviceType = () => 'desktop';
+        window.getServerTime = () => Date.now().toString();
+
+        // Player Info
+        window.getPlayerId = () => 'guest';
+        window.getPlayerName = () => 'Guest';
+        window.getPlayerPhotos = () => '[]';
         window.getIsPlayerAuthorized = () => 'false';
+        window.getIsPlayerAuthorizationSupported = () => 'false';
+        window.authorizePlayer = () => {};
+
+        // Game State
         window.getVisibilityState = () => 'visible';
+
+        // Storage (The Saving Part)
         window.getStorageDefaultType = () => 'local';
         window.getIsStorageSupported = () => 'true';
         window.getIsStorageAvailable = () => 'true';
-        window.getInterstitialState = () => 'closed';
-        window.getIsBannerSupported = () => 'false';
 
-        // 2. MOCK BRIDGE OBJECT
-        window.bridge = {
-            initialize: () => Promise.resolve(),
-            platform: { id: 'web', language: 'en' },
-            storage: { isSupported: () => true, isAvailable: () => true, defaultType: 'local' },
-            advertisement: { interstitialState: 'closed', isBannerSupported: false },
-            game: { visibilityState: 'visible' }
-        };
-
-        // 3. STORAGE LOGIC
-        window.getStorageData = (key) => {
+        window.getStorageData = function(key) {
             const data = localStorage.getItem(key) || "";
             if (window.unityInstance) {
                 window.unityInstance.SendMessage('PlaygamaBridge', 'OnGetStorageDataSuccess', `${key}{bridge_data_separator}${data}`);
             }
         };
-        window.setStorageData = (key, value) => {
+
+        window.setStorageData = function(key, value) {
             localStorage.setItem(key, value);
-            if (window.unityInstance) window.unityInstance.SendMessage('PlaygamaBridge', 'OnSetStorageDataSuccess', key);
+            if (window.unityInstance) {
+                window.unityInstance.SendMessage('PlaygamaBridge', 'OnSetStorageDataSuccess', key);
+            }
         };
 
-        // 4. PANIC BUTTON (-)
+        window.deleteStorageData = function(key) {
+            localStorage.removeItem(key);
+            if (window.unityInstance) {
+                window.unityInstance.SendMessage('PlaygamaBridge', 'OnDeleteStorageDataSuccess', key);
+            }
+        };
+
+        // Ads (Prevent Crashes)
+        window.getInterstitialState = () => 'closed';
+        window.getIsBannerSupported = () => 'false';
+        window.showInterstitial = () => {};
+        window.showRewarded = () => {};
+        window.showBanner = () => {};
+        window.hideBanner = () => {};
+
+        // Social & Leaderboards (Prevent Crashes)
+        window.getIsLeaderboardSupported = () => 'false';
+        window.getIsShareSupported = () => 'false';
+        window.getIsInviteFriendsSupported = () => 'false';
+        window.getIsJoinCommunitySupported = () => 'false';
+        window.share = () => {};
+        window.inviteFriends = () => {};
+        window.joinCommunity = () => {};
+
+        // --- 2. PANIC BUTTON (-) ---
         document.addEventListener('keydown', (e) => {
             if (e.key === '-') window.location.href = "https://classroom.google.com";
         });
+
     </script>
 
     <script src="https://cdn.jsdelivr.net/gh/ragdoi-archers/zort@main/Build/web.loader.js"></script>
@@ -75,6 +107,8 @@
         }).then((instance) => {
             window.unityInstance = instance;
             document.getElementById("loading-overlay").style.display = "none";
+        }).catch((err) => {
+            console.error("Unity Error:", err);
         });
     </script>
 </body>
